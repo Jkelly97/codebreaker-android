@@ -26,10 +26,7 @@ import edu.cnm.deepdive.codebreaker.viewmodel.MainViewModel;
 import java.util.HashMap;
 import java.util.Map;
 
-public class GameFragment extends Fragment implements InputFilter {
-
-
-  private static final String INVALID_CHAR_PATTERN = String.format("[^%s]", MainViewModel.POOL);
+public class GameFragment extends Fragment {
 
   private Map<Character, Integer> colorValueMap;
   private Map<Character, String> colorLabelMap;
@@ -56,48 +53,10 @@ public class GameFragment extends Fragment implements InputFilter {
     return binding.getRoot();
   }
 
-
   @Override
   public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
     setupViewModel();
-  }
-
-  private void setupViewModel() {
-    FragmentActivity activity = getActivity();
-    adapter = new GuessAdapter(activity, colorValueMap, colorLabelMap);
-    viewModel = new ViewModelProvider(activity).get(MainViewModel.class);
-    LifecycleOwner lifecycleOwner = getViewLifecycleOwner();
-    viewModel.getGame().observe(lifecycleOwner, this::updateGameDisplay);
-    viewModel.getSolved().observe(lifecycleOwner, solved ->
-        binding.guessControls.setVisibility(solved ? View.INVISIBLE : View.VISIBLE));
-  }
-
-  private void updateGameDisplay(Game game) {
-    adapter.clear();
-    adapter.addAll(game.getGuesses());
-    binding.guessList.setAdapter(adapter);
-    binding.guessList.setSelection(adapter.getCount() - 1);
-    codeLength = game.getLength();
-    for (int i = 0; i < spinners.length; i++) {
-      spinners[i].setVisibility((i < codeLength) ? View.VISIBLE : View.GONE);
-    }
-  }
-
-  private void setupViews() {
-    binding.submit.setOnClickListener((v) -> recordGuess());
-    int maxCodeLength = getResources().getInteger(R.integer.code_length_pref_max);
-    spinners = new Spinner[maxCodeLength];
-    LayoutInflater inflater = LayoutInflater.from(getContext());
-    for (int i = 0; i < maxCodeLength; i++) {
-      Spinner spinner =
-          (Spinner)inflater.inflate(R.layout.swatch_spinner, binding.guessControls, false);
-      CodeCharacterAdapter adapter = new CodeCharacterAdapter(
-          getContext(), colorValueMap, colorLabelMap, codeCharacters);
-      spinner.setAdapter(adapter);
-      spinners[i] = spinner;
-      binding.spinners.addView(spinner);
-    }
   }
 
   @Override
@@ -134,6 +93,45 @@ public class GameFragment extends Fragment implements InputFilter {
     colorLabelMap = buildLabelMap(colorCodes, colorLabels);
   }
 
+  private void setupViews() {
+    binding.submit.setOnClickListener((view) -> recordGuess());
+    int maxCodeLength = getResources().getInteger(R.integer.code_length_pref_max);
+    spinners = new Spinner[maxCodeLength];
+    LayoutInflater inflater = LayoutInflater.from(getContext());
+    for (int i = 0; i < maxCodeLength; i++) {
+      Spinner spinner =
+          (Spinner) inflater.inflate(R.layout.swatch_spinner, binding.guessControls, false);
+      CodeCharacterAdapter adapter = new CodeCharacterAdapter(
+          getContext(), colorValueMap, colorLabelMap, codeCharacters);
+      spinner.setAdapter(adapter);
+      spinners[i] = spinner;
+      binding.spinners.addView(spinner);
+    }
+  }
+
+  private void setupViewModel() {
+    FragmentActivity activity = getActivity();
+    //noinspection ConstantConditions
+    adapter = new GuessAdapter(activity, colorValueMap, colorLabelMap);
+    viewModel = new ViewModelProvider(activity).get(MainViewModel.class);
+    getLifecycle().addObserver(viewModel);
+    LifecycleOwner lifecycleOwner = getViewLifecycleOwner();
+    viewModel.getGame().observe(lifecycleOwner, this::updateGameDisplay);
+    viewModel.getSolved().observe(lifecycleOwner, solved ->
+        binding.guessControls.setVisibility(solved ? View.INVISIBLE : View.VISIBLE));
+  }
+
+  private void updateGameDisplay(Game game) {
+    adapter.clear();
+    adapter.addAll(game.getGuesses());
+    binding.guessList.setAdapter(adapter);
+    binding.guessList.setSelection(adapter.getCount() - 1);
+    codeLength = game.getLength();
+    for (int i = 0; i < spinners.length; i++) {
+      spinners[i].setVisibility((i < codeLength) ? View.VISIBLE : View.GONE);
+    }
+  }
+
   private void recordGuess() {
     StringBuilder builder = new StringBuilder(codeLength);
     for (int i = 0; i < codeLength; i++) {
@@ -164,21 +162,6 @@ public class GameFragment extends Fragment implements InputFilter {
       labelMap.put(chars[i], labels[i]);
     }
     return labelMap;
-  }
-
-  @Override
-  public CharSequence filter(CharSequence source, int start, int SourceEnd,
-      Spanned dest, int destStart, int destEnd) {
-    String modifiedSource = source.toString().toUpperCase().replaceAll(INVALID_CHAR_PATTERN, "");
-    StringBuilder builder = new StringBuilder(dest);
-    builder.replace(destStart, destEnd, modifiedSource);
-    if (builder.length() > codeLength) {
-      modifiedSource =
-          modifiedSource.substring(0, modifiedSource.length() - (builder.length() - codeLength));
-    }
-    int newLength = dest.length() - (destEnd - destStart) + modifiedSource.length();
-    binding.submit.setEnabled(newLength == codeLength);
-    return modifiedSource;
   }
 
 }
